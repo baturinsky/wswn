@@ -232,6 +232,9 @@
        */
       var earliness_weight =
         moveno > 50 ? 0 : parseInt(6 * Math.exp(moveno * -0.07));
+
+      earliness_weight = 0;
+      
       var king_should_hide = moveno < 12;
       var early = moveno < 5;
       /* find the pieces, kings, and weigh material*/
@@ -1688,7 +1691,7 @@
           border-radius: ${cellSize * 0.5}px;
           border: none;
           padding: ${cellSize * 0.5}px;        
-          ` }, [...new Array(cols * rows)].map((_, ind) => (h(Cell, { ind: ind, col: ind % cols, row: Math.floor(ind / cols), code: position[ind], onMouse: this.props.onMouse, animation: animatedCell != ind ? null : [animation.x, animation.y] })))),
+          ` }, [...new Array(cols * rows)].map((_, ind) => (h(Cell, { ind: ind, col: ind % cols, row: Math.floor(ind / cols), code: position[ind], possibleMove: this.props.canDropAt(ind), onMouse: this.props.onMouse, animation: animatedCell != ind ? null : [animation.x, animation.y] })))),
                 h("div", { class: "board-numbers", style: `
           top: ${cellSize * 0.9}px;
           font-size: ${cellSize * 0.4}px;
@@ -1710,12 +1713,14 @@
         const symbol = codei >= 0 ? pictures[codei] : code;
         const white = codei >= 0 && code.toUpperCase() == code;
         return (h("span", { style: animation
-                ? `top:${animation[1]}; left:${animation[0]}; z-index:5;`
+                ? `top:${animation[1]}; left:${animation[0]}; z-index:10;`
                 : null, class: "board-cell-content " + (white ? "white" : "black") }, symbol));
     };
     class Cell extends m {
-        render({ ind, col, row, code, animation, onMouse }) {
-            return (h("div", { onMouseDown: e => e.button == 0 && onMouse(MDOWN, ind), onMouseUp: e => e.button == 0 && onMouse(MUP, ind), onMouseMove: e => onMouse(MMOVE, ind), class: [col % 2 == row % 2 ? "even" : "odd"].join(" ") }, code && h(Piece, { code: code, animation: animation })));
+        render(p) {
+            return (h("div", { onMouseDown: e => e.button == 0 && p.onMouse(MDOWN, p.ind), onMouseUp: e => e.button == 0 && p.onMouse(MUP, p.ind), onMouseMove: e => p.onMouse(MMOVE, p.ind), class: (this.props.col % 2 == p.row % 2 ? "even" : "odd") +
+                    " board-cell" +
+                    (p.possibleMove ? " possible-move" : "") }, p.possibleMove ? (h("span", { class: "possible-marker" })) : (p.code && h(Piece, { code: p.code, animation: p.animation }))));
         }
     }
     class Menu extends m {
@@ -1728,8 +1733,8 @@
                         h("button", { class: "continue", onClick: this.props.toggleMenu }, "Continue")),
                     h("div", { class: "vertical-line" }),
                     h("div", { class: "saves" }, this.props.saves.map((save, i) => [
-                        h("button", { class: "load-button" + (i == this.props.lastSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? h("small", null, save[1].board) : "Save"),
-                        h("button", { class: "x-button", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
+                        h("button", { class: "load-button" + (i == this.props.lastSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, save[1].board + (i == 0 ? " AUTO" : ""))) : ("Save")),
+                        h("button", { class: "x-button", style: i == 0 ? "visibility:hidden" : "", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
                     ])))));
         }
     }
@@ -1737,14 +1742,12 @@
         constructor() {
             super();
             this.state = {
-                position: null /*[...new Array(64)]
-                  .map((_, i) => allCodes[Math.floor(rnd() * 1e9) % 14])
-                  .map(v => (v == " " ? null : v))*/,
+                position: null,
                 dragged: null,
                 over: 0,
                 paused: false,
                 autoPlay: false,
-                menu: true,
+                menu: false,
                 lastSave: 0,
                 saves: [],
                 history: [],
@@ -1754,6 +1757,21 @@
                 moden: 0
             };
             this.animation = null;
+            this.canDropAt = n => {
+                let placed = this.state.dragged;
+                if (!placed)
+                    return false;
+                if (this.state.position[n])
+                    return false;
+                if (placed == "P")
+                    return n >= 8 * 4 && n < 8 * 7;
+                if (placed == "p")
+                    return n >= 8 && n < 8 * 4;
+                if (placed.toUpperCase() == placed)
+                    return n >= 8 * 4;
+                else
+                    return n < 8 * 4;
+            };
             this.cancelDragging = () => {
                 if (this.state.draggedFrom) {
                     let position = this.state.position.slice();
@@ -1769,6 +1787,8 @@
                 }
                 if (action == MDOWN) {
                     if (this.over)
+                        return;
+                    if (!this.canDropAt(ind))
                         return;
                     if (ind == draggedFrom) {
                         this.cancelDragging();
@@ -1801,6 +1821,7 @@
                             yield this.aiMove();
                             this.nextBagPiece();
                             this.syncPosition();
+                            this.save(0);
                             if (!this.currentBagPiece) {
                                 this.setState({ autoPlay: true });
                                 this.autoPlay();
@@ -1830,6 +1851,7 @@
                 this.deserialize(localStorage.getItem(PREFIX + slot));
             };
             this.toggleMenu = () => {
+                this.syncSaves();
                 this.setState(state => ({ menu: !state.menu }));
             };
             this.pause = () => __awaiter(this, void 0, void 0, function* () {
@@ -1933,7 +1955,7 @@
                         stage: 1
                     };
                     this.setState({ position, animation: this.animation });
-                    let interval = setInterval(() => {
+                    let interval = setInterval(() => __awaiter(this, void 0, void 0, function* () {
                         this.setState({
                             animation: {
                                 cell: this.animation.cell,
@@ -1946,9 +1968,10 @@
                             clearInterval(interval);
                             this.setState({ animation: null });
                             this.syncPosition();
+                            console.log("anim end");
                             resolve();
                         }
-                    }, 20);
+                    }), 20);
                 });
             });
         }
@@ -1982,23 +2005,25 @@
         }
         render(props, { dragged, mouseAt, menu, position, animation, history, paused, autoPlay }) {
             let draggedAt = mouseAt ? mouseAt.map(v => v - cellSize / 2) : [-100, -100];
-            return menu ? (h(Menu, { lastSave: this.state.lastSave, saves: this.state.saves, toggleMenu: this.toggleMenu, saveAction: this.saveAction, start: this.start })) : (h("div", { onMouseMove: e => {
+            return menu ? (h(Menu, { lastSave: this.state.lastSave, saves: this.state.saves, toggleMenu: this.toggleMenu, saveAction: this.saveAction, start: this.start })) : (h("div", { class: "game", onMouseMove: e => {
                     if (e.target
                         .parentNode.classList.contains("board-grid"))
                         this.mouseMove([e.clientX, e.clientY]);
                     else
                         this.mouseMove(null);
                 }, style: `font-size:${Math.round(cellSize * 0.8)}px; cursor: ${dragged && mouseAt ? "none" : "default"};` },
-                h(Board, { cols: 8, rows: 8, Cell: Cell, position: position, onMouse: this.onMouse, animation: animation }),
+                h(Board, { cols: 8, rows: 8, Cell: Cell, position: position, canDropAt: this.canDropAt, onMouse: this.onMouse, animation: animation }),
                 h("div", { class: "dragged", style: `left:${draggedAt[0]}; top:${draggedAt[1]};` },
-                    h(Piece, { code: dragged, animation: animation })),
+                    h(Piece, { code: dragged })),
                 h("div", null,
                     h("button", { onClick: this.toggleMenu }, "Menu"),
-                    h("button", { onClick: e => this.save() }, "Save"),
                     h("button", { onClick: e => this.load() }, "Load"),
                     h("button", { style: `visibility:${this.state.autoPlay ? "visible" : "hidden"}`, onClick: this.pause }, paused ? "Continue" : "Pause"),
                     h("button", { onClick: this.undo, disabled: !dragged && !autoPlay && !paused }, "Undo")),
-                h("div", { class: "history" }, history.map((_, i) => i % 3 == 0 ? (h("span", { onMouseDown: e => this.jumpTo(i + 1) },
+                h("div", { class: "history" }, history.map((_, i) => i % 3 == 0 ? (h("span", { onMouseDown: e => {
+                        if (e.button == 0)
+                            this.jumpTo(i + 1);
+                    } },
                     " " + (i / 3 + 1),
                     ".",
                     history.slice(i, i + 3).join(" "))) : null))));

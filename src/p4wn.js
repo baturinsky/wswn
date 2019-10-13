@@ -213,6 +213,9 @@ export function p4_prepare(state) {
    */
   var earliness_weight =
     moveno > 50 ? 0 : parseInt(6 * Math.exp(moveno * -0.07));
+
+  earliness_weight = 0;
+  
   var king_should_hide = moveno < 12;
   var early = moveno < 5;
   /* find the pieces, kings, and weigh material*/

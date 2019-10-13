@@ -1,4 +1,10 @@
-import { h, render, FunctionalComponent, Component } from "preact";
+import {
+  h,
+  render,
+  FunctionalComponent,
+  Component,
+  createContext
+} from "preact";
 import {
   p4_fen2state,
   p4_jump_to_moveno,
@@ -107,6 +113,7 @@ class Board extends Component<{
   cols: number;
   rows: number;
   position: string[];
+  canDropAt: (number) => boolean;
   animation?: { cell: number; x: number; y: number };
   onMouse: (action: number, ind: number) => void;
   Cell;
@@ -132,6 +139,7 @@ class Board extends Component<{
               col={ind % cols}
               row={Math.floor(ind / cols)}
               code={position[ind]}
+              possibleMove={this.props.canDropAt(ind)}
               onMouse={this.props.onMouse}
               animation={
                 animatedCell != ind ? null : [animation.x, animation.y]
@@ -170,7 +178,7 @@ class Board extends Component<{
   }
 }
 
-const Piece: FunctionalComponent<{ code: string; animation: number[] }> = ({
+const Piece: FunctionalComponent<{ code: string; animation?: number[] }> = ({
   code,
   animation
 }) => {
@@ -182,7 +190,7 @@ const Piece: FunctionalComponent<{ code: string; animation: number[] }> = ({
     <span
       style={
         animation
-          ? `top:${animation[1]}; left:${animation[0]}; z-index:5;`
+          ? `top:${animation[1]}; left:${animation[0]}; z-index:10;`
           : null
       }
       class={"board-cell-content " + (white ? "white" : "black")}
@@ -192,23 +200,33 @@ const Piece: FunctionalComponent<{ code: string; animation: number[] }> = ({
   );
 };
 
-class Cell extends Component<{
+type CellProps = {
   ind: number;
   col: number;
   row: number;
   code: string;
+  possibleMove: boolean;
   animation: number[];
   onMouse: (action: number, ind: number) => void;
-}> {
-  render({ ind, col, row, code, animation, onMouse }) {
+};
+class Cell extends Component<CellProps> {
+  render(p: CellProps) {
     return (
       <div
-        onMouseDown={e => e.button == 0 && onMouse(MDOWN, ind)}
-        onMouseUp={e => e.button == 0 && onMouse(MUP, ind)}
-        onMouseMove={e => onMouse(MMOVE, ind)}
-        class={[col % 2 == row % 2 ? "even" : "odd"].join(" ")}
+        onMouseDown={e => e.button == 0 && p.onMouse(MDOWN, p.ind)}
+        onMouseUp={e => e.button == 0 && p.onMouse(MUP, p.ind)}
+        onMouseMove={e => p.onMouse(MMOVE, p.ind)}
+        class={
+          (this.props.col % 2 == p.row % 2 ? "even" : "odd") +
+          " board-cell" +
+          (p.possibleMove ? " possible-move" : "")
+        }
       >
-        {code && <Piece code={code} animation={animation} />}
+        {p.possibleMove ? (
+          <span class="possible-marker"></span>
+        ) : (
+          p.code && <Piece code={p.code} animation={p.animation} />
+        )}
       </div>
     );
   }
@@ -245,10 +263,15 @@ class Menu extends Component<{
                 }
                 onClick={e => this.props.saveAction(SAVE_OR_LOAD, i)}
               >
-                {save[1] ? <small>{save[1].board}</small> : "Save"}
+                {save[1] ? (
+                  <small>{save[1].board + (i == 0 ? " AUTO" : "")}</small>
+                ) : (
+                  "Save"
+                )}
               </button>,
               <button
                 class="x-button"
+                style={i == 0 ? "visibility:hidden" : ""}
                 disabled={!save[1]}
                 onClick={e => this.props.saveAction(REMOVE, i)}
               >
@@ -262,33 +285,30 @@ class Menu extends Component<{
   }
 }
 
-class Game extends Component<
-  {},
-  {
-    position: string[];
-    dragged: string;
-    draggedFrom: number;
-    mouseAt: number[];
-    history: string[];
-    over: number;
-    menu: boolean;
-    paused: boolean;
-    lastSave: number;
-    saves: [number, any][];
-    autoPlay: boolean;
-    moden: number;
-    animation: { cell: number; x: number; y: number };
-  }
-> {
+type GameState = {
+  position: string[];
+  dragged: string;
+  draggedFrom: number;
+  mouseAt: number[];
+  history: string[];
+  over: number;
+  menu: boolean;
+  paused: boolean;
+  lastSave: number;
+  saves: [number, any][];
+  autoPlay: boolean;
+  moden: number;
+  animation: { cell: number; x: number; y: number };
+};
+
+class Game extends Component<{}, GameState> {
   state = {
-    position: null /*[...new Array(64)]
-      .map((_, i) => allCodes[Math.floor(rnd() * 1e9) % 14])
-      .map(v => (v == " " ? null : v))*/,
+    position: null,
     dragged: null,
     over: 0,
     paused: false,
     autoPlay: false,
-    menu: true,
+    menu: false,
     lastSave: 0,
     saves: [],
     history: [],
@@ -296,7 +316,7 @@ class Game extends Component<
     mouseAt: [0, 0],
     animation: null,
     moden: 0
-  };
+  } as GameState;
 
   animation: { cell: number; x: number; y: number; stage: number } = null;
   game: p4state;
@@ -349,6 +369,16 @@ class Game extends Component<
     return this.state.over;
   }
 
+  canDropAt = n => {
+    let placed = this.state.dragged;
+    if (!placed) return false;
+    if (this.state.position[n]) return false;
+    if (placed == "P") return n >= 8 * 4 && n < 8 * 7;
+    if (placed == "p") return n >= 8 && n < 8 * 4;
+    if (placed.toUpperCase() == placed) return n >= 8 * 4;
+    else return n < 8 * 4;
+  };
+
   async aiMove() {
     if (this.over) return;
     let move = this.game.findmove(4);
@@ -373,6 +403,8 @@ class Game extends Component<
 
     if (action == MDOWN) {
       if (this.over) return;
+
+      if (!this.canDropAt(ind)) return;
 
       if (ind == draggedFrom) {
         this.cancelDragging();
@@ -407,6 +439,7 @@ class Game extends Component<
           await this.aiMove();
           this.nextBagPiece();
           this.syncPosition();
+          this.save(0);
           if (!this.currentBagPiece) {
             this.setState({ autoPlay: true });
             this.autoPlay();
@@ -442,7 +475,7 @@ class Game extends Component<
       };
       this.setState({ position, animation: this.animation });
 
-      let interval = setInterval(() => {
+      let interval = setInterval(async () => {
         this.setState({
           animation: {
             cell: this.animation.cell,
@@ -455,6 +488,7 @@ class Game extends Component<
           clearInterval(interval);
           this.setState({ animation: null });
           this.syncPosition();
+          console.log("anim end");
           resolve();
         }
       }, 20);
@@ -516,6 +550,7 @@ class Game extends Component<
   };
 
   toggleMenu = () => {
+    this.syncSaves();
     this.setState(state => ({ menu: !state.menu }));
   };
 
@@ -560,7 +595,7 @@ class Game extends Component<
         start={this.start}
       />
     ) : (
-      <div
+      <div class="game"
         onMouseMove={e => {
           if (
             ((e.target as HTMLElement)
@@ -578,6 +613,7 @@ class Game extends Component<
           rows={8}
           Cell={Cell}
           position={position}
+          canDropAt={this.canDropAt}
           onMouse={this.onMouse}
           animation={animation}
         />
@@ -585,11 +621,11 @@ class Game extends Component<
           class="dragged"
           style={`left:${draggedAt[0]}; top:${draggedAt[1]};`}
         >
-          <Piece code={dragged} animation={animation} />
+          <Piece code={dragged} />
         </div>
         <div>
           <button onClick={this.toggleMenu}>Menu</button>
-          <button onClick={e => this.save()}>Save</button>
+          {/* <button onClick={e => this.save()}>Save</button>*/}
           <button onClick={e => this.load()}>Load</button>
 
           <button
@@ -609,7 +645,11 @@ class Game extends Component<
         <div class="history">
           {history.map((_, i) =>
             i % 3 == 0 ? (
-              <span onMouseDown={e => this.jumpTo(i + 1)}>
+              <span
+                onMouseDown={e => {
+                  if (e.button == 0) this.jumpTo(i + 1);
+                }}
+              >
                 {" " + (i / 3 + 1)}.{history.slice(i, i + 3).join(" ")}
               </span>
             ) : null

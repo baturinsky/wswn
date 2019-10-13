@@ -14,7 +14,9 @@ body, button{
   flex-direction: row;
 }
 
-.bag{
+.game{
+  display:flex;
+  flex-direction: column;
 }
 
 div{
@@ -59,22 +61,24 @@ button:disabled{
 
 .board{  
   user-select: none;
+  margin: auto;
 }
 
 .board-grid{
   display: grid;  
   background: #844;
+  max-width: 660px;
 }
 
-.board-grid > div{
+.board-cell{
   display: flex;
   flex-direction: column; 
   align-content: center;
   justify-content: center;
 }
 
-.board-grid > div:hover{
-  border: dotted 1px black;
+.board-cell:hover{
+  border: dashed 1px black;
 }
 
 .odd{
@@ -106,14 +110,9 @@ button:disabled{
   pointer-events: none;
 }
 
-.board-cell-content{
-  position:relative;
-}
-
 .history{
   list-style: inside;
   font-size: 24px;
-  max-width: 660px;
   margin: auto;
   text-align: left;
   padding:5px;
@@ -147,7 +146,7 @@ button:disabled{
 } 
 
 .load-button{
-  width:400px !important;
+  width:500px !important;
 }
 
 .vertical-line{
@@ -186,4 +185,24 @@ small{
 .last-save{
   border: solid 3px black;
   font-weight: bold;
+}
+
+.board-cell-content{
+  position:relative;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.possible-move{
+  border: solid 5px rgba(255,255,255,0.15)
+}
+
+.board-cell:not(.possible-move){
+  cursor: not-allowed;
+}
+
+.possible-marker{
+  font-size: 14pt;
+  pointer-events: none;
+  color: white;
 }
