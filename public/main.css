@@ -1,0 +1,189 @@
+@font-face {
+  font-family: "CustomFont";
+  src: url("./DidactGothic.woff")  format("woff");
+}
+
+body, button{
+  font-family: CustomFont;
+}
+
+.centered{
+  display:flex;
+  width:100%;
+  justify-content: center;
+  flex-direction: row;
+}
+
+.bag{
+}
+
+div{
+  text-align: center;  
+}
+
+.spacer{
+  background: black;
+  width:1px;
+  margin-left:20px;
+  margin-right:20px;
+}
+
+button{
+  border: solid 1px #888;
+  cursor:pointer;
+  height:60px;
+  width:120px;
+  font-size: 24px;
+  margin:3px;  
+  background: #fff;
+}
+
+button:hover{
+  background: #ccc;
+}
+
+button:disabled{
+  background: #fff;
+  cursor: not-allowed;
+}
+
+
+.current-mode{
+  font-weight: bold;
+  border: solid 3px;
+}
+
+#ui{
+  text-align: left;
+}
+
+.board{  
+  user-select: none;
+}
+
+.board-grid{
+  display: grid;  
+  background: #844;
+}
+
+.board-grid > div{
+  display: flex;
+  flex-direction: column; 
+  align-content: center;
+  justify-content: center;
+}
+
+.board-grid > div:hover{
+  border: dotted 1px black;
+}
+
+.odd{
+  background:rgb(206, 94, 19);
+} 
+
+.even{
+  background:#F1C892;
+}
+
+.white{
+  color:white;
+  text-shadow: 0px 0px 2px black;
+}
+
+.black{
+  color:black;
+}
+
+.board-numbers, .board-letters{
+  position: absolute;
+  color: white;
+  display:grid;  
+}
+
+.dragged{
+  position:absolute;
+  user-select: none;
+  pointer-events: none;
+}
+
+.board-cell-content{
+  position:relative;
+}
+
+.history{
+  list-style: inside;
+  font-size: 24px;
+  max-width: 660px;
+  margin: auto;
+  text-align: left;
+  padding:5px;
+}
+
+.history > span:hover{
+  cursor: pointer;
+  background: #ddd;
+}
+
+.horisontal{
+  display:flex;
+  flex-direction: row;
+}
+
+.vertical{
+  display:flex;
+  flex-direction: column;
+}
+
+.menu button{
+  width: 240px;
+}
+
+.menu{
+  text-align: center;
+}
+
+.x-button{
+  width:60px !important; 
+} 
+
+.load-button{
+  width:400px !important;
+}
+
+.vertical-line{
+  width:1px;
+  margin:5px;
+  background:black;
+}
+
+.modes-grid{
+  display:grid;
+  grid-template-columns: 50% 50%;
+  grid-auto-rows: 66px;
+}
+
+.modes{
+  display: flex;
+  flex-direction: column;
+  align-content: space-around;
+  justify-content: space-between;
+}
+
+button.continue{
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.saves{
+  display:grid;  
+  grid-template-columns: auto auto;
+}
+
+small{
+  font-size: 70%;
+}
+
+.last-save{
+  border: solid 3px black;
+  font-weight: bold;
+}
