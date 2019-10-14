@@ -3,6 +3,7 @@
   src: url("./DidactGothic.woff")  format("woff");
 }
 
+
 body, button{
   font-family: CustomFont;
 }
@@ -34,7 +35,7 @@ button{
   border: solid 1px #888;
   cursor:pointer;
   height:60px;
-  width:120px;
+  width:160px;
   font-size: 24px;
   margin:3px;  
   background: #fff;
@@ -82,7 +83,7 @@ button:disabled{
 }
 
 .odd{
-  background:rgb(206, 94, 19);
+  background:#ce5e13;
 } 
 
 .even{
@@ -146,7 +147,7 @@ button:disabled{
 } 
 
 .load-button{
-  width:500px !important;
+  width:400px !important;
 }
 
 .vertical-line{
@@ -205,4 +206,8 @@ small{
   font-size: 14pt;
   pointer-events: none;
   color: white;
+}
+
+.placed-touch{
+  background: #ce5e13;
 }

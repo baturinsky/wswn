@@ -66,7 +66,6 @@ const modes: Mode[] = [
   },
   {
     name: "Double Nothing",
-    //bag: "KpPrRpPbBpPnNpPqQpPnNpPbBpPrRpP",
     bag: "KpPrRpPbBpPnNpPqPpPnNpPbBpPrRpP",
     board: "4k3/8/8/8/8/8/8/8 b - - 0 1"
   }
@@ -235,12 +234,11 @@ class Cell extends Component<CellProps> {
 class Menu extends Component<{
   lastSave: number;
   toggleMenu: () => void;
-  saves: [number, any][];
+  saves: [number, {board:string}][];
   saveAction: (action: number, slot: number) => void;
   start: (mode: number) => void;
 }> {
   render() {
-    console.log(this.props.saves);
     return (
       <div class="vertical menu">
         <div class="horisontal">
@@ -264,14 +262,13 @@ class Menu extends Component<{
                 onClick={e => this.props.saveAction(SAVE_OR_LOAD, i)}
               >
                 {save[1] ? (
-                  <small>{save[1].board + (i == 0 ? " AUTO" : "")}</small>
+                  <small>{save[1].board.replace(/\//g, " ") /* + (i == 0 ? " AUTO" : "")*/}</small>
                 ) : (
                   "Save"
                 )}
               </button>,
               <button
                 class="x-button"
-                style={i == 0 ? "visibility:hidden" : ""}
                 disabled={!save[1]}
                 onClick={e => this.props.saveAction(REMOVE, i)}
               >
@@ -298,6 +295,7 @@ type GameState = {
   saves: [number, any][];
   autoPlay: boolean;
   moden: number;
+  maxSave: number;
   animation: { cell: number; x: number; y: number };
 };
 
@@ -342,7 +340,7 @@ class Game extends Component<{}, GameState> {
     let mode = modes[moden];
     this.bag = mode.bag + "";
     if (mode.random) {
-      this.bag = this.bag
+      this.bag = this.bag.substr(0,1)+this.bag.substr(1)
         .split("")
         .sort(() => (Math.random() > 0.5 ? 1 : -1))
         .join("");
@@ -357,11 +355,21 @@ class Game extends Component<{}, GameState> {
 
   syncSaves() {
     let saves = [];
+    let maxSave = 0;
+    let prefixLength = PREFIX.length;
+    for (let k in localStorage) {
+      if (k.substr(0, prefixLength) == PREFIX) {
+        let n = Number(k.substr(prefixLength)) || 0;
+        maxSave = Math.max(n, maxSave);
+      }
+    }
+
     let lastSave: number = 1 * (localStorage[PREFIX + "last"] || 0);
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i <= maxSave + 1; i++) {
       saves.push([i, JSON.parse(localStorage[PREFIX + i] || null)]);
     }
-    this.setState({ lastSave, saves });
+
+    this.setState({ lastSave, saves, maxSave });
     return saves;
   }
 
@@ -439,7 +447,7 @@ class Game extends Component<{}, GameState> {
           await this.aiMove();
           this.nextBagPiece();
           this.syncPosition();
-          this.save(0);
+          this.save();
           if (!this.currentBagPiece) {
             this.setState({ autoPlay: true });
             this.autoPlay();
@@ -578,7 +586,7 @@ class Game extends Component<{}, GameState> {
 
   start = (moden: number) => {
     this.init(moden);
-    this.setState({ menu: false });
+    this.setState(state => ({ menu: false, lastSave: state.maxSave + 1 }));
   };
 
   render(
@@ -595,7 +603,8 @@ class Game extends Component<{}, GameState> {
         start={this.start}
       />
     ) : (
-      <div class="game"
+      <div
+        class="game"
         onMouseMove={e => {
           if (
             ((e.target as HTMLElement)
@@ -618,15 +627,15 @@ class Game extends Component<{}, GameState> {
           animation={animation}
         />
         <div
-          class="dragged"
-          style={`left:${draggedAt[0]}; top:${draggedAt[1]};`}
+          class={"dragged" + (isTouchDevice()?" placed-touch":"")}
+          style={isTouchDevice()?`left:10; top:${cellSize*4}`:`left:${draggedAt[0]}; top:${draggedAt[1]};`}
         >
           <Piece code={dragged} />
         </div>
         <div>
           <button onClick={this.toggleMenu}>Menu</button>
-          {/* <button onClick={e => this.save()}>Save</button>*/}
-          <button onClick={e => this.load()}>Load</button>
+          {/* <button onClick={e => this.save()}>Save</button>
+          <button onClick={e => this.load()}>Load</button>*/}
 
           <button
             style={`visibility:${this.state.autoPlay ? "visible" : "hidden"}`}

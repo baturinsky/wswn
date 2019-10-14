@@ -1625,6 +1625,9 @@
     const SAVE_OR_LOAD = 0;
     const REMOVE = 1;
     const PREFIX = "wswn_";
+    function isTouchDevice() {
+        return "ontouchstart" in window || navigator.maxTouchPoints;
+    }
     const codes = " prnbkq";
     const allCodes = "  PpRrNnBbKkQq";
     const pictures = " ♟♜♞♝♚♛";
@@ -1649,7 +1652,6 @@
         },
         {
             name: "Double Nothing",
-            //bag: "KpPrRpPbBpPnNpPqQpPnNpPbBpPrRpP",
             bag: "KpPrRpPbBpPnNpPqPpPnNpPbBpPrRpP",
             board: "4k3/8/8/8/8/8/8/8 b - - 0 1"
         }
@@ -1725,7 +1727,6 @@
     }
     class Menu extends m {
         render() {
-            console.log(this.props.saves);
             return (h("div", { class: "vertical menu" },
                 h("div", { class: "horisontal" },
                     h("div", { class: "modes" },
@@ -1733,8 +1734,8 @@
                         h("button", { class: "continue", onClick: this.props.toggleMenu }, "Continue")),
                     h("div", { class: "vertical-line" }),
                     h("div", { class: "saves" }, this.props.saves.map((save, i) => [
-                        h("button", { class: "load-button" + (i == this.props.lastSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, save[1].board + (i == 0 ? " AUTO" : ""))) : ("Save")),
-                        h("button", { class: "x-button", style: i == 0 ? "visibility:hidden" : "", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
+                        h("button", { class: "load-button" + (i == this.props.lastSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, save[1].board.replace(/\//g, " ") /* + (i == 0 ? " AUTO" : "")*/)) : ("Save")),
+                        h("button", { class: "x-button", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
                     ])))));
         }
     }
@@ -1821,7 +1822,7 @@
                             yield this.aiMove();
                             this.nextBagPiece();
                             this.syncPosition();
-                            this.save(0);
+                            this.save();
                             if (!this.currentBagPiece) {
                                 this.setState({ autoPlay: true });
                                 this.autoPlay();
@@ -1878,7 +1879,7 @@
             };
             this.start = (moden) => {
                 this.init(moden);
-                this.setState({ menu: false });
+                this.setState(state => ({ menu: false, lastSave: state.maxSave + 1 }));
             };
             this.init(0);
             document.addEventListener("mousedown", e => {
@@ -1896,7 +1897,7 @@
             let mode = modes[moden];
             this.bag = mode.bag + "";
             if (mode.random) {
-                this.bag = this.bag
+                this.bag = this.bag.substr(0, 1) + this.bag.substr(1)
                     .split("")
                     .sort(() => (Math.random() > 0.5 ? 1 : -1))
                     .join("");
@@ -1910,11 +1911,19 @@
         }
         syncSaves() {
             let saves = [];
+            let maxSave = 0;
+            let prefixLength = PREFIX.length;
+            for (let k in localStorage) {
+                if (k.substr(0, prefixLength) == PREFIX) {
+                    let n = Number(k.substr(prefixLength)) || 0;
+                    maxSave = Math.max(n, maxSave);
+                }
+            }
             let lastSave = 1 * (localStorage[PREFIX + "last"] || 0);
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i <= maxSave + 1; i++) {
                 saves.push([i, JSON.parse(localStorage[PREFIX + i] || null)]);
             }
-            this.setState({ lastSave, saves });
+            this.setState({ lastSave, saves, maxSave });
             return saves;
         }
         get over() {
@@ -2013,11 +2022,10 @@
                         this.mouseMove(null);
                 }, style: `font-size:${Math.round(cellSize * 0.8)}px; cursor: ${dragged && mouseAt ? "none" : "default"};` },
                 h(Board, { cols: 8, rows: 8, Cell: Cell, position: position, canDropAt: this.canDropAt, onMouse: this.onMouse, animation: animation }),
-                h("div", { class: "dragged", style: `left:${draggedAt[0]}; top:${draggedAt[1]};` },
+                h("div", { class: "dragged" + (isTouchDevice() ? " placed-touch" : ""), style: isTouchDevice() ? `left:10; top:${cellSize * 4}` : `left:${draggedAt[0]}; top:${draggedAt[1]};` },
                     h(Piece, { code: dragged })),
                 h("div", null,
                     h("button", { onClick: this.toggleMenu }, "Menu"),
-                    h("button", { onClick: e => this.load() }, "Load"),
                     h("button", { style: `visibility:${this.state.autoPlay ? "visible" : "hidden"}`, onClick: this.pause }, paused ? "Continue" : "Pause"),
                     h("button", { onClick: this.undo, disabled: !dragged && !autoPlay && !paused }, "Undo")),
                 h("div", { class: "history" }, history.map((_, i) => i % 3 == 0 ? (h("span", { onMouseDown: e => {
