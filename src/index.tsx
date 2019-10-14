@@ -374,7 +374,7 @@ class Game extends Component<{}, GameState> {
   }
 
   get over() {
-    return this.state.over;
+    return this.game.over;
   }
 
   canDropAt = n => {
@@ -448,7 +448,7 @@ class Game extends Component<{}, GameState> {
           this.nextBagPiece();
           this.syncPosition();
           this.save();
-          if (!this.currentBagPiece) {
+          if (!this.currentBagPiece && !this.over) {
             this.setState({ autoPlay: true });
             this.autoPlay();
           }
@@ -456,6 +456,10 @@ class Game extends Component<{}, GameState> {
       }
     }
   };
+
+  canUndo(){
+    return this.game.moveno >= 4  && (this.currentBagPiece || this.over);
+  }
 
   async autoPlay() {
     while (!this.over && !this.state.paused) {
@@ -517,7 +521,7 @@ class Game extends Component<{}, GameState> {
   }
 
   undo = async () => {
-    if (this.game.moveno < 4 || (this.state.autoPlay && !this.state.paused))
+    if (!this.canUndo())
       return;
     p4_jump_to_moveno(this.game, Math.floor(this.game.moveno / 3 - 1) * 3 + 1);
     this.syncPosition();
@@ -646,7 +650,7 @@ class Game extends Component<{}, GameState> {
 
           <button
             onClick={this.undo}
-            disabled={!dragged && !autoPlay && !paused}
+            disabled={!this.canUndo()}
           >
             Undo
           </button>

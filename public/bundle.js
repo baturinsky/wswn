@@ -1823,7 +1823,7 @@
                             this.nextBagPiece();
                             this.syncPosition();
                             this.save();
-                            if (!this.currentBagPiece) {
+                            if (!this.currentBagPiece && !this.over) {
                                 this.setState({ autoPlay: true });
                                 this.autoPlay();
                             }
@@ -1835,7 +1835,7 @@
                 this.setState({ mouseAt: at });
             };
             this.undo = () => __awaiter(this, void 0, void 0, function* () {
-                if (this.game.moveno < 4 || (this.state.autoPlay && !this.state.paused))
+                if (!this.canUndo())
                     return;
                 p4_jump_to_moveno(this.game, Math.floor(this.game.moveno / 3 - 1) * 3 + 1);
                 this.syncPosition();
@@ -1927,7 +1927,7 @@
             return saves;
         }
         get over() {
-            return this.state.over;
+            return this.game.over;
         }
         aiMove() {
             return __awaiter(this, void 0, void 0, function* () {
@@ -1937,6 +1937,9 @@
                 let res = this.game.move(move[0], move[1]);
                 yield this.animateMove(...fromP4Move(move));
             });
+        }
+        canUndo() {
+            return this.game.moveno >= 4 && (this.currentBagPiece || this.over);
         }
         autoPlay() {
             return __awaiter(this, void 0, void 0, function* () {
@@ -2027,7 +2030,7 @@
                 h("div", null,
                     h("button", { onClick: this.toggleMenu }, "Menu"),
                     h("button", { style: `visibility:${this.state.autoPlay ? "visible" : "hidden"}`, onClick: this.pause }, paused ? "Continue" : "Pause"),
-                    h("button", { onClick: this.undo, disabled: !dragged && !autoPlay && !paused }, "Undo")),
+                    h("button", { onClick: this.undo, disabled: !this.canUndo() }, "Undo")),
                 h("div", { class: "history" }, history.map((_, i) => i % 3 == 0 ? (h("span", { onMouseDown: e => {
                         if (e.button == 0)
                             this.jumpTo(i + 1);
