@@ -1653,7 +1653,7 @@
         {
             name: "Double Nothing",
             bag: "KpPrRpPbBpPnNpPqPpPnNpPbBpPrRpP",
-            board: "4k3/8/8/8/8/8/8/8 b - - 0 1"
+            board: "4k3/4p3/8/8/8/8/8/8 b - - 0 1"
         }
     ];
     function delay(time) {
@@ -1822,24 +1822,16 @@
                         }
                         else {
                             let converted = toP4Move([-allCodes.indexOf(dragged), ind]);
-                            this.game.move(...converted);
-                            this.syncPosition();
-                            this.setState({ dragged: null, draggedFrom: null });
-                            yield this.aiMove();
-                            yield this.aiMove();
-                            this.nextBagPiece();
-                            this.syncPosition();
-                            this.save();
-                            if (!this.currentBagPiece && !this.over) {
-                                this.setState({ autoPlay: true });
-                                this.autoPlay();
-                            }
+                            this.fullMove(converted);
                         }
                     }
                 }
             });
             this.mouseMove = (at) => {
                 this.setState({ mouseAt: at });
+            };
+            this.pass = () => {
+                this.fullMove([-1, -1]);
             };
             this.undo = () => __awaiter(this, void 0, void 0, function* () {
                 if (!this.canUndo())
@@ -1990,6 +1982,22 @@
                 yield this.animateMove(...fromP4Move(move));
             });
         }
+        fullMove(converted) {
+            return __awaiter(this, void 0, void 0, function* () {
+                this.game.move(...converted);
+                this.syncPosition();
+                this.setState({ dragged: null, draggedFrom: null });
+                yield this.aiMove();
+                yield this.aiMove();
+                this.nextBagPiece();
+                this.syncPosition();
+                this.save();
+                if (!this.currentBagPiece && !this.over) {
+                    this.setState({ autoPlay: true });
+                    this.autoPlay();
+                }
+            });
+        }
         canUndo() {
             return this.game.moveno >= 4 && (this.currentBagPiece || this.over);
         }
@@ -2067,6 +2075,9 @@
             this.game.jump_to_moveno(this.game.moveno);
             this.syncPosition();
         }
+        canPass() {
+            return this.state.dragged != "K";
+        }
         render(props, { dragged, mouseAt, menu, position, animation, history, paused, autoPlay }) {
             let draggedAt = mouseAt ? mouseAt.map(v => v - cellSize / 2) : [-100, -100];
             return menu ? (h(Menu, { currentSave: this.state.currentSave, saves: this.state.saves, continue: (this.game || this.state.currentSave) && this.continue, saveAction: this.saveAction, start: this.start })) : (h("div", { class: "game", onMouseMove: e => {
@@ -2076,6 +2087,7 @@
                     else
                         this.mouseMove(null);
                 }, style: `font-size:${Math.round(cellSize * 0.8)}px; cursor: ${dragged && mouseAt ? "none" : "default"};` },
+                this.over > 0 && h("div", { class: "game-over" }, ["WHITE WIN", "BLACK WIN", "DRAW"][this.over]),
                 h(Board, { cols: 8, rows: 8, Cell: Cell, position: position, canDropAt: this.canDropAt, onMouse: this.onMouse, animation: animation }),
                 h("div", { class: "dragged" + (isTouchDevice() ? " placed-touch" : ""), style: isTouchDevice()
                         ? `left:10; top:${cellSize * 4}`
@@ -2084,6 +2096,7 @@
                 h("div", null,
                     h("button", { onClick: this.toggleMenu }, "Menu"),
                     h("button", { style: `visibility:${this.state.autoPlay ? "visible" : "hidden"}`, onClick: this.pause }, paused ? "Continue" : "Pause"),
+                    h("button", { onClick: this.pass, disabled: !this.canPass() }, "Pass"),
                     h("button", { onClick: this.undo, disabled: !this.canUndo() }, "Undo")),
                 h("div", { class: "history" }, history.map((_, i) => i % 3 == 0 ? (h("span", { onMouseDown: e => {
                         if (e.button == 0)

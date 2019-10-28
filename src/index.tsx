@@ -67,7 +67,7 @@ const modes: Mode[] = [
   {
     name: "Double Nothing",
     bag: "KpPrRpPbBpPnNpPqPpPnNpPbBpPrRpP",
-    board: "4k3/8/8/8/8/8/8/8 b - - 0 1"
+    board: "4k3/4p3/8/8/8/8/8/8 b - - 0 1"
   }
 ];
 
@@ -473,22 +473,27 @@ class Game extends Component<{}, GameState> {
           }
         } else {
           let converted = toP4Move([-allCodes.indexOf(dragged), ind]);
-          this.game.move(...converted);
-          this.syncPosition();
-          this.setState({ dragged: null, draggedFrom: null });
-          await this.aiMove();
-          await this.aiMove();
-          this.nextBagPiece();
-          this.syncPosition();
-          this.save();
-          if (!this.currentBagPiece && !this.over) {
-            this.setState({ autoPlay: true });
-            this.autoPlay();
-          }
+          this.fullMove(converted)
         }
       }
     }
   };
+
+  async fullMove(converted:[number, number]){
+    this.game.move(...converted);
+    this.syncPosition();
+    this.setState({ dragged: null, draggedFrom: null });
+    await this.aiMove();
+    await this.aiMove();
+    this.nextBagPiece();
+    this.syncPosition();
+    this.save();
+    if (!this.currentBagPiece && !this.over) {
+      this.setState({ autoPlay: true });
+      this.autoPlay();
+    }
+
+  }
 
   canUndo() {
     return this.game.moveno >= 4 && (this.currentBagPiece || this.over);
@@ -551,6 +556,10 @@ class Game extends Component<{}, GameState> {
       history: this.game.historyStrings,
       over: this.game.over
     });
+  }
+
+  pass = () => {
+    this.fullMove([-1, -1]);
   }
 
   undo = async () => {
@@ -650,6 +659,10 @@ class Game extends Component<{}, GameState> {
     this.toggleMenu();
   };
 
+  canPass(){
+    return this.state.dragged != "K";
+  }
+
   render(
     props,
     { dragged, mouseAt, menu, position, animation, history, paused, autoPlay }
@@ -678,6 +691,7 @@ class Game extends Component<{}, GameState> {
           dragged && mouseAt ? "none" : "default"
         };`}
       >
+        {this.over>0 && <div class="game-over">{["WHITE WIN", "BLACK WIN", "DRAW"][this.over]}</div>}
         <Board
           cols={8}
           rows={8}
@@ -708,7 +722,9 @@ class Game extends Component<{}, GameState> {
           >
             {paused ? "Continue" : "Pause"}
           </button>
-
+          <button onClick={this.pass} disabled={!this.canPass()}>
+            Pass
+          </button>
           <button onClick={this.undo} disabled={!this.canUndo()}>
             Undo
           </button>
@@ -724,7 +740,7 @@ class Game extends Component<{}, GameState> {
                 {" " + (i / 3 + 1)}.{history.slice(i, i + 3).join(" ")}
               </span>
             ) : null
-          )}
+          )}          
         </div>
       </div>
     );
