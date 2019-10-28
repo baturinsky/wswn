@@ -1728,15 +1728,22 @@
     class Menu extends m {
         render() {
             return (h("div", { class: "vertical menu" },
+                h("h1", null, "White Starts With Nothing"),
                 h("div", { class: "horisontal" },
                     h("div", { class: "modes" },
-                        h("div", { class: "modes-grid" }, modes.map((mode, i) => (h("button", { onClick: e => this.props.start(i) }, mode.name)))),
-                        h("button", { class: "continue", onClick: this.props.toggleMenu }, "Continue")),
-                    h("div", { class: "vertical-line" }),
-                    h("div", { class: "saves" }, this.props.saves.map((save, i) => [
-                        h("button", { class: "load-button" + (i == this.props.lastSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, save[1].board.replace(/\//g, " ") /* + (i == 0 ? " AUTO" : "")*/)) : ("Save")),
-                        h("button", { class: "x-button", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
-                    ])))));
+                        "Select game mode",
+                        h("div", { class: "modes-grid" }, modes.map((mode, i) => (h("button", { onClick: e => this.props.start(String(i)) }, mode.name)))),
+                        this.props.continue && (h("button", { class: "continue", onClick: this.props.continue }, "Continue"))),
+                    this.props.saves.length > 0 && [
+                        h("div", { class: "vertical-line" }),
+                        h("div", { class: "saves" },
+                            h("div", { style: "grid-column-end: span 2;" }, "or load a save"),
+                            this.props.saves.map((save, i) => [
+                                h("button", { class: "load-button" +
+                                        (save[0] == this.props.currentSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, (save[1].board || modes[0].board).replace(/\//g, " ") /* + (i == 0 ? " AUTO" : "")*/)) : ("Save")),
+                                h("button", { class: "x-button", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
+                            ]))
+                    ])));
         }
     }
     class Game extends m {
@@ -1748,8 +1755,8 @@
                 over: 0,
                 paused: false,
                 autoPlay: false,
-                menu: false,
-                lastSave: 0,
+                menu: true,
+                currentSave: null,
                 saves: [],
                 history: [],
                 draggedFrom: null,
@@ -1841,15 +1848,21 @@
                 this.syncPosition();
             });
             this.save = (slot) => {
-                if (isNaN(+slot))
-                    slot = this.state.lastSave;
-                localStorage.setItem(PREFIX + slot, this.serialize());
+                if (!slot)
+                    slot = this.state.currentSave;
+                localStorage.setItem(slot, this.serialize());
+                localStorage.setItem(PREFIX + "current", slot);
                 console.log(this.game.history);
             };
             this.load = (slot) => {
-                if (isNaN(+slot))
-                    slot = this.state.lastSave;
-                this.deserialize(localStorage.getItem(PREFIX + slot));
+                if (!slot)
+                    slot = this.state.currentSave;
+                let data = localStorage.getItem(slot);
+                if (!data)
+                    return false;
+                this.deserialize(data);
+                localStorage.setItem(PREFIX + "current", slot);
+                return true;
             };
             this.toggleMenu = () => {
                 this.syncSaves();
@@ -1862,26 +1875,45 @@
                 if (wasPaused)
                     this.autoPlay();
             });
-            this.saveAction = (action, slot) => {
-                if (action == REMOVE)
-                    localStorage.removeItem(PREFIX + slot);
+            this.saveAction = (action, slotInd) => {
+                let save = this.state.saves[slotInd];
+                if (action == REMOVE) {
+                    localStorage.removeItem(save[0]);
+                    if (this.state.currentSave == save[0]) {
+                        localStorage.removeItem(PREFIX + "current");
+                    }
+                }
                 else if (action == SAVE_OR_LOAD) {
-                    if (this.state.saves[slot][1]) {
-                        this.load(slot);
+                    if (this.state.saves[slotInd][1]) {
+                        this.load(save[0]);
                         this.setState({ menu: false });
                     }
                     else {
-                        this.save(slot);
+                        this.save(save[0]);
                     }
-                    localStorage.setItem(PREFIX + "last", slot + "");
                 }
                 this.syncSaves();
             };
-            this.start = (moden) => {
+            this.start = (moden) => __awaiter(this, void 0, void 0, function* () {
                 this.init(moden);
-                this.setState(state => ({ menu: false, lastSave: state.maxSave + 1 }));
+                yield delay(0);
+                this.save(PREFIX + (this.state.maxSave + 1));
+                this.syncSaves();
+                this.toggleMenu();
+            });
+            this.continue = () => {
+                if (this.game) {
+                    this.toggleMenu();
+                    return;
+                }
+                if (this.load(this.state.currentSave)) {
+                    this.toggleMenu();
+                    return;
+                }
+                this.init("0");
+                this.toggleMenu();
             };
-            this.init(0);
+            this.init();
             document.addEventListener("mousedown", e => {
                 if (!this.state.mouseAt)
                     this.cancelDragging();
@@ -1893,37 +1925,57 @@
         nextBagPiece() {
             return this.currentBagPiece;
         }
-        init(moden) {
-            let mode = modes[moden];
-            this.bag = mode.bag + "";
-            if (mode.random) {
-                this.bag = this.bag.substr(0, 1) + this.bag.substr(1)
-                    .split("")
-                    .sort(() => (Math.random() > 0.5 ? 1 : -1))
-                    .join("");
+        init(modeName = "empty") {
+            if (modeName != "empty") {
+                let moden = 0;
+                if (modeName in modes)
+                    moden = Number(modeName);
+                else
+                    moden = modes.findIndex(m => m.name == modeName);
+                let mode = modes[moden];
+                this.bag = mode.bag + "";
+                if (mode.random) {
+                    this.bag =
+                        this.bag.substr(0, 1) +
+                            this.bag
+                                .substr(1)
+                                .split("")
+                                .sort(() => (Math.random() > 0.5 ? 1 : -1))
+                                .join("");
+                }
+                this.game = p4_fen2state(mode.board);
+                this.nextBagPiece();
+                this.setState({ moden, over: 0, paused: false, autoPlay: false });
+                this.syncPosition();
+                this.syncSaves();
             }
-            this.game = p4_fen2state(mode.board);
-            this.nextBagPiece();
-            this.setState({ moden, over: 0, paused: false, autoPlay: false });
-            this.syncPosition();
-            this.syncSaves();
-            console.log(this.game);
+            else {
+                this.syncSaves();
+            }
+            //console.log(this.game);
         }
         syncSaves() {
             let saves = [];
             let maxSave = 0;
             let prefixLength = PREFIX.length;
+            let saveNames = [];
             for (let k in localStorage) {
                 if (k.substr(0, prefixLength) == PREFIX) {
+                    if (k == PREFIX + "current")
+                        continue;
+                    saveNames.push(k);
                     let n = Number(k.substr(prefixLength)) || 0;
                     maxSave = Math.max(n, maxSave);
                 }
             }
-            let lastSave = 1 * (localStorage[PREFIX + "last"] || 0);
-            for (let i = 0; i <= maxSave + 1; i++) {
-                saves.push([i, JSON.parse(localStorage[PREFIX + i] || null)]);
+            let currentSave = localStorage[PREFIX + "current"];
+            for (let name of saveNames) {
+                saves.push([name, JSON.parse(localStorage[name] || null)]);
             }
-            this.setState({ lastSave, saves, maxSave });
+            if (this.game)
+                saves.push([PREFIX + (maxSave + 1), null]);
+            saves = saves.sort((a, b) => (a[0] > b[0] ? 1 : -1));
+            this.setState({ currentSave, saves, maxSave });
             return saves;
         }
         get over() {
@@ -2017,7 +2069,7 @@
         }
         render(props, { dragged, mouseAt, menu, position, animation, history, paused, autoPlay }) {
             let draggedAt = mouseAt ? mouseAt.map(v => v - cellSize / 2) : [-100, -100];
-            return menu ? (h(Menu, { lastSave: this.state.lastSave, saves: this.state.saves, toggleMenu: this.toggleMenu, saveAction: this.saveAction, start: this.start })) : (h("div", { class: "game", onMouseMove: e => {
+            return menu ? (h(Menu, { currentSave: this.state.currentSave, saves: this.state.saves, continue: (this.game || this.state.currentSave) && this.continue, saveAction: this.saveAction, start: this.start })) : (h("div", { class: "game", onMouseMove: e => {
                     if (e.target
                         .parentNode.classList.contains("board-grid"))
                         this.mouseMove([e.clientX, e.clientY]);
@@ -2025,7 +2077,9 @@
                         this.mouseMove(null);
                 }, style: `font-size:${Math.round(cellSize * 0.8)}px; cursor: ${dragged && mouseAt ? "none" : "default"};` },
                 h(Board, { cols: 8, rows: 8, Cell: Cell, position: position, canDropAt: this.canDropAt, onMouse: this.onMouse, animation: animation }),
-                h("div", { class: "dragged" + (isTouchDevice() ? " placed-touch" : ""), style: isTouchDevice() ? `left:10; top:${cellSize * 4}` : `left:${draggedAt[0]}; top:${draggedAt[1]};` },
+                h("div", { class: "dragged" + (isTouchDevice() ? " placed-touch" : ""), style: isTouchDevice()
+                        ? `left:10; top:${cellSize * 4}`
+                        : `left:${draggedAt[0]}; top:${draggedAt[1]};` },
                     h(Piece, { code: dragged })),
                 h("div", null,
                     h("button", { onClick: this.toggleMenu }, "Menu"),

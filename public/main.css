@@ -152,8 +152,7 @@ button:disabled{
 
 .vertical-line{
   width:1px;
-  margin:5px;
-  background:black;
+  margin:10px;
 }
 
 .modes-grid{
@@ -176,7 +175,12 @@ button.continue{
 
 .saves{
   display:grid;  
-  grid-template-columns: auto auto;
+  grid-template-columns: auto auto;  
+}
+
+.saves{
+  vertical-align: top;
+  height: 20px;
 }
 
 small{

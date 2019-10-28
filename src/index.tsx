@@ -232,50 +232,65 @@ class Cell extends Component<CellProps> {
 }
 
 class Menu extends Component<{
-  lastSave: number;
-  toggleMenu: () => void;
-  saves: [number, {board:string}][];
-  saveAction: (action: number, slot: number) => void;
-  start: (mode: number) => void;
+  currentSave: string;
+  continue: () => void;
+  saves: [string, { board: string }][];
+  saveAction: (action: number, slotInd: number) => void;
+  start: (moden: string) => void;
 }> {
   render() {
     return (
       <div class="vertical menu">
+        <h1>White Starts With Nothing</h1>
         <div class="horisontal">
           <div class="modes">
+            Select game mode
             <div class="modes-grid">
               {modes.map((mode, i) => (
-                <button onClick={e => this.props.start(i)}>{mode.name}</button>
+                <button onClick={e => this.props.start(String(i))}>
+                  {mode.name}
+                </button>
               ))}
             </div>
-            <button class="continue" onClick={this.props.toggleMenu}>
-              Continue
-            </button>
-          </div>
-          <div class="vertical-line"></div>
-          <div class="saves">
-            {this.props.saves.map((save, i) => [
-              <button
-                class={
-                  "load-button" + (i == this.props.lastSave ? " last-save" : "")
-                }
-                onClick={e => this.props.saveAction(SAVE_OR_LOAD, i)}
-              >
-                {save[1] ? (
-                  <small>{save[1].board.replace(/\//g, " ") /* + (i == 0 ? " AUTO" : "")*/}</small>
-                ) : (
-                  "Save"
-                )}
-              </button>,
-              <button
-                class="x-button"
-                disabled={!save[1]}
-                onClick={e => this.props.saveAction(REMOVE, i)}
-              >
-                X
+            {this.props.continue && (
+              <button class="continue" onClick={this.props.continue}>
+                Continue
               </button>
-            ])}
+            )}
           </div>
+          {this.props.saves.length > 0 && [
+            <div class="vertical-line"></div>,
+            <div class="saves">
+              <div style="grid-column-end: span 2;">or load a save</div>
+              {this.props.saves.map((save, i) => [
+                <button
+                  class={
+                    "load-button" +
+                    (save[0] == this.props.currentSave ? " last-save" : "")
+                  }
+                  onClick={e => this.props.saveAction(SAVE_OR_LOAD, i)}
+                >
+                  {save[1] ? (
+                    <small>
+                      {(save[1].board || modes[0].board).replace(
+                        /\//g,
+                        " "
+                      ) /* + (i == 0 ? " AUTO" : "")*/}
+                    </small>
+                  ) : (
+                    "Save"
+                  )}
+                </button>,
+                <button
+                  class="x-button"
+                  disabled={!save[1]}
+                  onClick={e => this.props.saveAction(REMOVE, i)}
+                >
+                  X
+                </button>
+              ])}
+            </div>
+          ]}
         </div>
       </div>
     );
@@ -291,8 +306,8 @@ type GameState = {
   over: number;
   menu: boolean;
   paused: boolean;
-  lastSave: number;
-  saves: [number, any][];
+  currentSave: string;
+  saves: [string, any][];
   autoPlay: boolean;
   moden: number;
   maxSave: number;
@@ -306,8 +321,8 @@ class Game extends Component<{}, GameState> {
     over: 0,
     paused: false,
     autoPlay: false,
-    menu: false,
-    lastSave: 0,
+    menu: true,
+    currentSave: null,
     saves: [],
     history: [],
     draggedFrom: null,
@@ -330,46 +345,64 @@ class Game extends Component<{}, GameState> {
 
   constructor() {
     super();
-    this.init(0);
+    this.init();
     document.addEventListener("mousedown", e => {
       if (!this.state.mouseAt) this.cancelDragging();
     });
   }
 
-  init(moden: number) {
-    let mode = modes[moden];
-    this.bag = mode.bag + "";
-    if (mode.random) {
-      this.bag = this.bag.substr(0,1)+this.bag.substr(1)
-        .split("")
-        .sort(() => (Math.random() > 0.5 ? 1 : -1))
-        .join("");
+  init(modeName: string = "empty") {
+    if (modeName != "empty") {
+      let moden = 0;
+      if (modeName in modes) moden = Number(modeName);
+      else moden = modes.findIndex(m => m.name == modeName);
+      let mode = modes[moden];
+      this.bag = mode.bag + "";
+      if (mode.random) {
+        this.bag =
+          this.bag.substr(0, 1) +
+          this.bag
+            .substr(1)
+            .split("")
+            .sort(() => (Math.random() > 0.5 ? 1 : -1))
+            .join("");
+      }
+      this.game = p4_fen2state(mode.board);
+      this.nextBagPiece();
+      this.setState({ moden, over: 0, paused: false, autoPlay: false });
+      this.syncPosition();
+      this.syncSaves();
+    } else {
+      this.syncSaves();
     }
-    this.game = p4_fen2state(mode.board);
-    this.nextBagPiece();
-    this.setState({ moden, over: 0, paused: false, autoPlay: false });
-    this.syncPosition();
-    this.syncSaves();
-    console.log(this.game);
+    //console.log(this.game);
   }
 
   syncSaves() {
     let saves = [];
     let maxSave = 0;
     let prefixLength = PREFIX.length;
+
+    let saveNames: string[] = [];
     for (let k in localStorage) {
       if (k.substr(0, prefixLength) == PREFIX) {
+        if (k == PREFIX + "current") continue;
+        saveNames.push(k);
         let n = Number(k.substr(prefixLength)) || 0;
         maxSave = Math.max(n, maxSave);
       }
     }
 
-    let lastSave: number = 1 * (localStorage[PREFIX + "last"] || 0);
-    for (let i = 0; i <= maxSave + 1; i++) {
-      saves.push([i, JSON.parse(localStorage[PREFIX + i] || null)]);
+    let currentSave: string = localStorage[PREFIX + "current"];
+    for (let name of saveNames) {
+      saves.push([name, JSON.parse(localStorage[name] || null)]);
     }
 
-    this.setState({ lastSave, saves, maxSave });
+    if (this.game) saves.push([PREFIX + (maxSave + 1), null]);
+
+    saves = saves.sort((a, b) => (a[0] > b[0] ? 1 : -1));
+
+    this.setState({ currentSave, saves, maxSave });
     return saves;
   }
 
@@ -457,8 +490,8 @@ class Game extends Component<{}, GameState> {
     }
   };
 
-  canUndo(){
-    return this.game.moveno >= 4  && (this.currentBagPiece || this.over);
+  canUndo() {
+    return this.game.moveno >= 4 && (this.currentBagPiece || this.over);
   }
 
   async autoPlay() {
@@ -521,8 +554,7 @@ class Game extends Component<{}, GameState> {
   }
 
   undo = async () => {
-    if (!this.canUndo())
-      return;
+    if (!this.canUndo()) return;
     p4_jump_to_moveno(this.game, Math.floor(this.game.moveno / 3 - 1) * 3 + 1);
     this.syncPosition();
   };
@@ -550,15 +582,20 @@ class Game extends Component<{}, GameState> {
     this.syncPosition();
   }
 
-  save = (slot?: number) => {
-    if (isNaN(+slot)) slot = this.state.lastSave;
-    localStorage.setItem(PREFIX + slot, this.serialize());
+  save = (slot?: string) => {
+    if (!slot) slot = this.state.currentSave;
+    localStorage.setItem(slot, this.serialize());
+    localStorage.setItem(PREFIX + "current", slot);
     console.log(this.game.history);
   };
 
-  load = (slot?: number) => {
-    if (isNaN(+slot)) slot = this.state.lastSave;
-    this.deserialize(localStorage.getItem(PREFIX + slot));
+  load = (slot?: string) => {
+    if (!slot) slot = this.state.currentSave;
+    let data = localStorage.getItem(slot);
+    if (!data) return false;
+    this.deserialize(data);
+    localStorage.setItem(PREFIX + "current", slot);
+    return true;
   };
 
   toggleMenu = () => {
@@ -573,24 +610,44 @@ class Game extends Component<{}, GameState> {
     if (wasPaused) this.autoPlay();
   };
 
-  saveAction = (action: number, slot: number) => {
-    if (action == REMOVE) localStorage.removeItem(PREFIX + slot);
-    else if (action == SAVE_OR_LOAD) {
-      if (this.state.saves[slot][1]) {
-        this.load(slot);
+  saveAction = (action: number, slotInd: number) => {
+    let save = this.state.saves[slotInd];
+    if (action == REMOVE) {
+      localStorage.removeItem(save[0]);
+      if (this.state.currentSave == save[0]) {
+        localStorage.removeItem(PREFIX + "current");
+      }
+    } else if (action == SAVE_OR_LOAD) {
+      if (this.state.saves[slotInd][1]) {
+        this.load(save[0]);
         this.setState({ menu: false });
       } else {
-        this.save(slot);
+        this.save(save[0]);
       }
-      localStorage.setItem(PREFIX + "last", slot + "");
     }
 
     this.syncSaves();
   };
 
-  start = (moden: number) => {
+  start = async (moden: string) => {
     this.init(moden);
-    this.setState(state => ({ menu: false, lastSave: state.maxSave + 1 }));
+    await delay(0);
+    this.save(PREFIX + (this.state.maxSave + 1));
+    this.syncSaves();
+    this.toggleMenu();
+  };
+
+  continue = () => {
+    if (this.game) {
+      this.toggleMenu();
+      return;
+    }
+    if (this.load(this.state.currentSave)) {
+      this.toggleMenu();
+      return;
+    }
+    this.init("0");
+    this.toggleMenu();
   };
 
   render(
@@ -600,9 +657,9 @@ class Game extends Component<{}, GameState> {
     let draggedAt = mouseAt ? mouseAt.map(v => v - cellSize / 2) : [-100, -100];
     return menu ? (
       <Menu
-        lastSave={this.state.lastSave}
+        currentSave={this.state.currentSave}
         saves={this.state.saves}
-        toggleMenu={this.toggleMenu}
+        continue={(this.game || this.state.currentSave) && this.continue}
         saveAction={this.saveAction}
         start={this.start}
       />
@@ -631,8 +688,12 @@ class Game extends Component<{}, GameState> {
           animation={animation}
         />
         <div
-          class={"dragged" + (isTouchDevice()?" placed-touch":"")}
-          style={isTouchDevice()?`left:10; top:${cellSize*4}`:`left:${draggedAt[0]}; top:${draggedAt[1]};`}
+          class={"dragged" + (isTouchDevice() ? " placed-touch" : "")}
+          style={
+            isTouchDevice()
+              ? `left:10; top:${cellSize * 4}`
+              : `left:${draggedAt[0]}; top:${draggedAt[1]};`
+          }
         >
           <Piece code={dragged} />
         </div>
@@ -648,10 +709,7 @@ class Game extends Component<{}, GameState> {
             {paused ? "Continue" : "Pause"}
           </button>
 
-          <button
-            onClick={this.undo}
-            disabled={!this.canUndo()}
-          >
+          <button onClick={this.undo} disabled={!this.canUndo()}>
             Undo
           </button>
         </div>
