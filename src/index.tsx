@@ -50,6 +50,8 @@ const ALLOW_NORMAL_MOVE = false;
 
 type Mode = { name: string; bag: string; board: string; random?: boolean, description:string };
 
+let pieceCost=[0,0,1,-1,5,-5,3,-3,3,-3,0,0,9,-9];
+
 const modes: Mode[] = [
   {
     name: "Start With Nothing",
@@ -243,7 +245,7 @@ class Cell extends Component<CellProps> {
 class Menu extends Component<{
   currentSave: string;
   continue: () => void;
-  saves: [string, { board: string }][];
+  saves: [string, { board: string, moden:number }][];
   saveAction: (action: number, slotInd: number) => void;
   start: (moden: number) => void;
 }> {
@@ -284,7 +286,7 @@ class Menu extends Component<{
                       {(save[1].board || modes[0].board).replace(
                         /\//g,
                         " "
-                      ) /* + (i == 0 ? " AUTO" : "")*/}
+                      ) + " " + modes[save[1].moden].name}
                     </small>
                   ) : (
                     "Save"
@@ -602,6 +604,16 @@ class Game extends Component<{}, GameState> {
     });
   }
 
+  calculateMaterial(){
+    let material = 0;
+    for(let move of this.game.history){
+      if(move[0]<0 && move[1] != -1){
+        material += pieceCost[-move[0]]
+      }
+    }
+    return material;
+  }
+
   deserialize(save: string) {
     let data = JSON.parse(save);
     this.seed = data.seed;
@@ -743,7 +755,10 @@ class Game extends Component<{}, GameState> {
           >
             {this.over > 0 && (
               <div class="game-over">
-                {["WHITE WIN", "BLACK WIN", "DRAW"][this.over]}
+                <h1>{[0, "BLACK WIN", "WHITE WIN", "DRAW"][this.over]}</h1>
+                <div>Turns: <big>{Math.ceil(this.game.history.length/3)}</big>{" "}
+                Placed pieces cost: <big>{this.calculateMaterial()}</big></div>
+                <div>Score (200 - Turns - Cost*3): <big>{200 - Math.ceil(this.game.history.length/3) - this.calculateMaterial()*3}</big></div>
               </div>
             )}
             <Board

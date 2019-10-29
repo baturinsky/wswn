@@ -224,13 +224,18 @@ small{
   z-index: 10;
   background: rgba(255, 255, 255, 0.8);
   top:25%;
-  left:40%;
-  width:20%;
+  left:35%;
+  width:30%;
   text-align: center;
+  font-size: 24px;
 }
 
 .intro{
   width:400px;
   margin-bottom:30px;
   font-size:18pt;
+}
+
+big{
+  font-size: 200%;
 }

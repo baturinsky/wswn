@@ -1642,6 +1642,7 @@
     const pictures = " ♟♜♞♝♚♛";
     const cellSize = 80;
     const ALLOW_NORMAL_MOVE = false;
+    let pieceCost = [0, 0, 1, -1, 5, -5, 3, -3, 3, -3, 0, 0, 9, -9];
     const modes = [
         {
             name: "Start With Nothing",
@@ -1755,7 +1756,7 @@
                             h("div", { style: "grid-column-end: span 2;" }, "or load a save"),
                             this.props.saves.map((save, i) => [
                                 h("button", { class: "load-button" +
-                                        (save[0] == this.props.currentSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, (save[1].board || modes[0].board).replace(/\//g, " ") /* + (i == 0 ? " AUTO" : "")*/)) : ("Save")),
+                                        (save[0] == this.props.currentSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, (save[1].board || modes[0].board).replace(/\//g, " ") + " " + modes[save[1].moden].name)) : ("Save")),
                                 h("button", { class: "x-button", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
                             ]))
                     ])));
@@ -2093,6 +2094,15 @@
                 board: p4_state2fen(this.game)
             });
         }
+        calculateMaterial() {
+            let material = 0;
+            for (let move of this.game.history) {
+                if (move[0] < 0 && move[1] != -1) {
+                    material += pieceCost[-move[0]];
+                }
+            }
+            return material;
+        }
         deserialize(save) {
             let data = JSON.parse(save);
             this.seed = data.seed;
@@ -2132,7 +2142,17 @@
                             else
                                 this.mouseMove(null);
                         }, style: `font-size:${Math.round(cellSize * 0.8)}px; cursor: ${dragged && mouseAt ? "none" : "default"};` },
-                        this.over > 0 && (h("div", { class: "game-over" }, ["WHITE WIN", "BLACK WIN", "DRAW"][this.over])),
+                        this.over > 0 && (h("div", { class: "game-over" },
+                            h("h1", null, [0, "BLACK WIN", "WHITE WIN", "DRAW"][this.over]),
+                            h("div", null,
+                                "Turns: ",
+                                h("big", null, Math.ceil(this.game.history.length / 3)),
+                                " ",
+                                "Placed pieces cost: ",
+                                h("big", null, this.calculateMaterial())),
+                            h("div", null,
+                                "Score (200 - Turns - Cost*3): ",
+                                h("big", null, 200 - Math.ceil(this.game.history.length / 3) - this.calculateMaterial() * 3)))),
                         h(Board, { cols: 8, rows: 8, Cell: Cell, position: position, canDropAt: this.canDropAt, onMouse: this.onMouse, animation: animation }),
                         h("div", { class: "dragged" + (isTouchDevice() ? " placed-touch" : ""), style: isTouchDevice()
                                 ? `left:10; top:${cellSize * 4}`
