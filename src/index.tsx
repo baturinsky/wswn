@@ -63,7 +63,7 @@ const modes: Mode[] = [
     name: "Human Wave",
     bag: "KPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
     board: "rnbqkbnr/pppppppp/8/8/8/8/8/8 b kq - 0 1",
-    description: `Plays by the same rules as "Start with Nothing", but you only can place King and Pawns. But you have a lot of them.`
+    description: `Plays by the same rules as "Start with Nothing", but you only can place King and (a lot of) Pawns.`
   },
   {
     name: "Randomised",
@@ -699,10 +699,10 @@ class Game extends Component<{}, GameState> {
           <h1>White Starts With Nothing</h1>
           <div class="intro">
           This game plays by Chess rules, but instead of moving pieces directly, 
-          you gradually place white (and in some modes, black) pieces and leaves making moves to AI.<br/>
+          you gradually place white (and in some modes, black) pieces and leave making moves to AI.<br/>
           Goal is, naturally, the winning of the white side.
           Note that you only can place pieces on respective side's half of the board,
-          and pawns also can't be placed on first or last row.
+          and pawns also can't be placed on the first or last row.
           </div>
           <button onClick={e=>this.goPage(PMENU)}>Start</button>
         </div>;
