@@ -215,7 +215,7 @@ export function p4_prepare(state) {
     moveno > 50 ? 0 : parseInt(6 * Math.exp(moveno * -0.07));
 
   earliness_weight = 0;
-  
+
   var king_should_hide = moveno < 12;
   var early = moveno < 5;
   /* find the pieces, kings, and weigh material*/
@@ -408,6 +408,29 @@ export function p4_prepare(state) {
 
 export function p4_maybe_prepare(state) {
   if (!state.prepared) p4_prepare(state);
+}
+
+export function p4_captures_(state, a, s) {
+  var captures = [];
+  var other_colour = 1 - (a & 17);
+  if (a > 2) {
+    var moves = P4_MOVES[a];
+    for (i = 0; i < 8; i++) {
+      e = s + moves[i];
+      E = board[e];
+      if (E) {
+        if ((E & 17) == other_colour) captures.push(e);
+        break;
+      }
+    }
+  } else {
+    var dir = 10 - 20 * colour;
+    for (let e in [s + dir - 1, s + dir + 1]) {
+      E = board[e];
+      if (E && (E & 17) == other_colour) captures.push(e);
+    }
+  }
+  return captures;
 }
 
 export function p4_parse(state, colour, ep, score) {
@@ -1116,10 +1139,9 @@ export function p4_move(state, s, e, promotion) {
   p4_log("successful move", s, e, movestring, flags);
   state.prepared = false;
 
-  if(flags & P4_MOVE_FLAG_MATE){
+  if (flags & P4_MOVE_FLAG_MATE) {
     state.over = state.to_play + 1;
-  }
-  else if(flags & P4_MOVE_FLAG_DRAW){
+  } else if (flags & P4_MOVE_FLAG_DRAW) {
     state.over = 3;
   }
 
@@ -1136,7 +1158,7 @@ export function p4_move2string(state, s, e, S, promotion, flags, moves) {
   var mv, i;
   var capture = flags & P4_MOVE_FLAG_CAPTURE;
 
-  if (e <0 ) return "-";
+  if (e < 0) return "-";
 
   dest = p4_stringify_point(e);
   if (s < 0) return P4_ENCODE_LUT.charAt(S) + dest;

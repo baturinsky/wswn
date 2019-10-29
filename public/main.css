@@ -168,9 +168,11 @@ button:disabled{
   justify-content: space-between;
 }
 
-button.continue{
+button.menu-continue{
   margin-left: auto;
   margin-right: auto;
+  margin-top: 50px;
+  width: 486px;
 }
 
 .saves{
@@ -225,4 +227,10 @@ small{
   left:40%;
   width:20%;
   text-align: center;
+}
+
+.intro{
+  width:400px;
+  margin-bottom:30px;
+  font-size:18pt;
 }

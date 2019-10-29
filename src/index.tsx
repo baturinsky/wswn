@@ -21,19 +21,22 @@ const BLACK_WIN = 1;
 const WHITE_WIN = 2;
 const DRAW = 3;
 
+const PGAME = 1;
+const PMENU = 2;
+const PLANDING = 3;
+const PSTART = 4;
+
 const SAVE_OR_LOAD = 0;
 const REMOVE = 1;
 
 const PREFIX = "wswn_";
 
-function seed(s: number) {
+function newRng(s: number) {
   return () => {
     const x = Math.sin(s++) * 10000;
     return x - Math.floor(x);
   };
 }
-
-const rnd = seed(15);
 
 function isTouchDevice() {
   return "ontouchstart" in window || navigator.maxTouchPoints;
@@ -45,29 +48,35 @@ const pictures = " ♟♜♞♝♚♛";
 const cellSize = 80;
 const ALLOW_NORMAL_MOVE = false;
 
-type Mode = { name: string; bag: string; board: string; random?: boolean };
+type Mode = { name: string; bag: string; board: string; random?: boolean, description:string };
 
 const modes: Mode[] = [
   {
     name: "Start With Nothing",
     bag: "KPRPBPNPQPNPBPRP",
-    board: "rnbqkbnr/pppppppp/8/8/8/8/8/8 b kq - 0 1"
+    board: "rnbqkbnr/pppppppp/8/8/8/8/8/8 b kq - 0 1",
+    description: `"Classic" mode. You place all usual white pieces in order, black starts with all pieces already in place.
+    Not that you can "Pass" the piece placement. You can use it to try and win with the least pieces placed possible.
+    `
   },
   {
     name: "Human Wave",
     bag: "KPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
-    board: "rnbqkbnr/pppppppp/8/8/8/8/8/8 b kq - 0 1"
+    board: "rnbqkbnr/pppppppp/8/8/8/8/8/8 b kq - 0 1",
+    description: `Plays by the same rules as "Start with Nothing", but you only can place King and Pawns. But you have a lot of them.`
   },
   {
     name: "Randomised",
     bag: "KPRPBPNPQPNPBPRP",
     board: "rnbqkbnr/pppppppp/8/8/8/8/8/8 b kq - 0 1",
-    random: true
+    random: true,
+    description: `In this mode order of pieces (other than King) is randomised.`
   },
   {
     name: "Double Nothing",
     bag: "KpPrRpPbBpPnNpPqPpPnNpPbBpPrRpP",
-    board: "4k3/4p3/8/8/8/8/8/8 b - - 0 1"
+    board: "4k3/4p3/8/8/8/8/8/8 b - - 0 1",
+    description: `Both sides start with (nearly) nothing, and you place pieces for both of them.`
   }
 ];
 
@@ -236,7 +245,7 @@ class Menu extends Component<{
   continue: () => void;
   saves: [string, { board: string }][];
   saveAction: (action: number, slotInd: number) => void;
-  start: (moden: string) => void;
+  start: (moden: number) => void;
 }> {
   render() {
     return (
@@ -247,13 +256,13 @@ class Menu extends Component<{
             Select game mode
             <div class="modes-grid">
               {modes.map((mode, i) => (
-                <button onClick={e => this.props.start(String(i))}>
+                <button onClick={e => this.props.start(i)}>
                   {mode.name}
                 </button>
               ))}
             </div>
             {this.props.continue && (
-              <button class="continue" onClick={this.props.continue}>
+              <button class="menu-continue" onClick={this.props.continue}>
                 Continue
               </button>
             )}
@@ -304,12 +313,13 @@ type GameState = {
   mouseAt: number[];
   history: string[];
   over: number;
-  menu: boolean;
+  page: number;
   paused: boolean;
   currentSave: string;
   saves: [string, any][];
   autoPlay: boolean;
   moden: number;
+  newmoden: number;
   maxSave: number;
   animation: { cell: number; x: number; y: number };
 };
@@ -321,22 +331,26 @@ class Game extends Component<{}, GameState> {
     over: 0,
     paused: false,
     autoPlay: false,
-    menu: true,
+    page: PLANDING,
     currentSave: null,
     saves: [],
     history: [],
     draggedFrom: null,
     mouseAt: [0, 0],
     animation: null,
-    moden: 0
+    moden: 0,
+    newmoden: 0,
   } as GameState;
 
   animation: { cell: number; x: number; y: number; stage: number } = null;
   game: p4state;
   bag: string;
+  seed = 0;
+  passes = 0;
+  rng: ()=>number;
 
   get currentBagPiece() {
-    return !this.over && this.bag[Math.floor(this.game.moveno / 3)];
+    return !this.over && this.bag[Math.floor(this.game.moveno / 3) - this.passes];
   }
 
   nextBagPiece(): string {
@@ -351,20 +365,24 @@ class Game extends Component<{}, GameState> {
     });
   }
 
-  init(modeName: string = "empty") {
+  init(modeName: string|number = "empty") {
     if (modeName != "empty") {
       let moden = 0;
       if (modeName in modes) moden = Number(modeName);
       else moden = modes.findIndex(m => m.name == modeName);
       let mode = modes[moden];
+      this.passes = 0;
       this.bag = mode.bag + "";
       if (mode.random) {
+        if(!this.seed)
+          this.seed =Math.random();
+        this.rng = newRng(this.seed);
         this.bag =
           this.bag.substr(0, 1) +
           this.bag
             .substr(1)
             .split("")
-            .sort(() => (Math.random() > 0.5 ? 1 : -1))
+            .sort(() => (this.rng() > 0.5 ? 1 : -1))
             .join("");
       }
       this.game = p4_fen2state(mode.board);
@@ -473,13 +491,13 @@ class Game extends Component<{}, GameState> {
           }
         } else {
           let converted = toP4Move([-allCodes.indexOf(dragged), ind]);
-          this.fullMove(converted)
+          this.fullMove(converted);
         }
       }
     }
   };
 
-  async fullMove(converted:[number, number]){
+  async fullMove(converted: [number, number]) {
     this.game.move(...converted);
     this.syncPosition();
     this.setState({ dragged: null, draggedFrom: null });
@@ -492,7 +510,6 @@ class Game extends Component<{}, GameState> {
       this.setState({ autoPlay: true });
       this.autoPlay();
     }
-
   }
 
   canUndo() {
@@ -503,6 +520,7 @@ class Game extends Component<{}, GameState> {
     while (!this.over && !this.state.paused) {
       console.log(this.state);
       this.game.move(-1, -1);
+      this.passes++;
       await this.aiMove();
       await this.aiMove();
     }
@@ -560,7 +578,8 @@ class Game extends Component<{}, GameState> {
 
   pass = () => {
     this.fullMove([-1, -1]);
-  }
+    this.passes ++;
+  };
 
   undo = async () => {
     if (!this.canUndo()) return;
@@ -577,6 +596,7 @@ class Game extends Component<{}, GameState> {
   serialize() {
     return JSON.stringify({
       moden: this.state.moden,
+      seed: this.seed,
       history: this.game.history,
       board: p4_state2fen(this.game)
     });
@@ -584,6 +604,7 @@ class Game extends Component<{}, GameState> {
 
   deserialize(save: string) {
     let data = JSON.parse(save);
+    this.seed = data.seed;
     this.init(data.moden);
     this.game.history = data.history;
     this.game.moveno = data.history.length + 1;
@@ -609,7 +630,11 @@ class Game extends Component<{}, GameState> {
 
   toggleMenu = () => {
     this.syncSaves();
-    this.setState(state => ({ menu: !state.menu }));
+    this.setState(state => ({ page: state.page == PMENU ? PGAME : PMENU }));
+  };
+
+  goPage = (page: number) => {
+    this.setState({ page });
   };
 
   pause = async () => {
@@ -629,7 +654,7 @@ class Game extends Component<{}, GameState> {
     } else if (action == SAVE_OR_LOAD) {
       if (this.state.saves[slotInd][1]) {
         this.load(save[0]);
-        this.setState({ menu: false });
+        this.goPage(PGAME);
       } else {
         this.save(save[0]);
       }
@@ -638,112 +663,144 @@ class Game extends Component<{}, GameState> {
     this.syncSaves();
   };
 
-  start = async (moden: string) => {
-    this.init(moden);
+  start = async (newmoden: number) => {
+    this.setState({newmoden})
+    this.goPage(PSTART)
+  }
+
+  reallyStart = async (moden: number) => {
+    this.init(String(moden));
     await delay(0);
     this.save(PREFIX + (this.state.maxSave + 1));
     this.syncSaves();
-    this.toggleMenu();
+    this.goPage(PGAME);
   };
 
   continue = () => {
-    if (this.game) {
-      this.toggleMenu();
-      return;
-    }
-    if (this.load(this.state.currentSave)) {
-      this.toggleMenu();
-      return;
-    }
-    this.init("0");
-    this.toggleMenu();
+    if (!this.game)
+      if (!this.load(this.state.currentSave))
+        this.init(0);
+    this.goPage(PGAME);
   };
 
-  canPass(){
+  canPass() {
     return this.state.dragged != "K";
   }
 
   render(
     props,
-    { dragged, mouseAt, menu, position, animation, history, paused, autoPlay }
+    { dragged, mouseAt, page, position, animation, history, paused, autoPlay }
   ) {
     let draggedAt = mouseAt ? mouseAt.map(v => v - cellSize / 2) : [-100, -100];
-    return menu ? (
-      <Menu
-        currentSave={this.state.currentSave}
-        saves={this.state.saves}
-        continue={(this.game || this.state.currentSave) && this.continue}
-        saveAction={this.saveAction}
-        start={this.start}
-      />
-    ) : (
-      <div
-        class="game"
-        onMouseMove={e => {
-          if (
-            ((e.target as HTMLElement)
-              .parentNode as HTMLElement).classList.contains("board-grid")
-          )
-            this.mouseMove([e.clientX, e.clientY]);
-          else this.mouseMove(null);
-        }}
-        style={`font-size:${Math.round(cellSize * 0.8)}px; cursor: ${
-          dragged && mouseAt ? "none" : "default"
-        };`}
-      >
-        {this.over>0 && <div class="game-over">{["WHITE WIN", "BLACK WIN", "DRAW"][this.over]}</div>}
-        <Board
-          cols={8}
-          rows={8}
-          Cell={Cell}
-          position={position}
-          canDropAt={this.canDropAt}
-          onMouse={this.onMouse}
-          animation={animation}
-        />
-        <div
-          class={"dragged" + (isTouchDevice() ? " placed-touch" : "")}
-          style={
-            isTouchDevice()
-              ? `left:10; top:${cellSize * 4}`
-              : `left:${draggedAt[0]}; top:${draggedAt[1]};`
-          }
-        >
-          <Piece code={dragged} />
-        </div>
-        <div>
-          <button onClick={this.toggleMenu}>Menu</button>
-          {/* <button onClick={e => this.save()}>Save</button>
+
+    switch (page) {
+      case PLANDING:
+        return <div>
+          <h1>White Starts With Nothing</h1>
+          <div class="intro">
+          This game plays by Chess rules, but instead of moving pieces directly, 
+          you gradually place white (and in some modes, black) pieces and leaves making moves to AI.<br/>
+          Goal is, naturally, the winning of the white side.
+          Note that you only can place pieces on respective side's half of the board,
+          and pawns also can't be placed on first or last row.
+          </div>
+          <button onClick={e=>this.goPage(PMENU)}>Start</button>
+        </div>;
+      case PSTART:      
+        return <div>
+          <h1>{modes[this.state.newmoden].name}</h1>
+          <div class="intro">
+          {modes[this.state.newmoden].description}
+          </div>
+          <button onClick={e=>this.goPage(PMENU)}>Cancel</button>
+          <button onClick={e=>this.reallyStart(this.state.newmoden)}>Start</button>
+        </div>;
+      case PMENU:
+        return (
+          <Menu
+            currentSave={this.state.currentSave}
+            saves={this.state.saves}
+            continue={(this.game || this.state.currentSave) && this.continue}
+            saveAction={this.saveAction}
+            start={this.start}
+          />
+        );
+      case PGAME:
+        return (
+          <div
+            class="game"
+            onMouseMove={e => {
+              if (
+                ((e.target as HTMLElement)
+                  .parentNode as HTMLElement).classList.contains("board-grid")
+              )
+                this.mouseMove([e.clientX, e.clientY]);
+              else this.mouseMove(null);
+            }}
+            style={`font-size:${Math.round(cellSize * 0.8)}px; cursor: ${
+              dragged && mouseAt ? "none" : "default"
+            };`}
+          >
+            {this.over > 0 && (
+              <div class="game-over">
+                {["WHITE WIN", "BLACK WIN", "DRAW"][this.over]}
+              </div>
+            )}
+            <Board
+              cols={8}
+              rows={8}
+              Cell={Cell}
+              position={position}
+              canDropAt={this.canDropAt}
+              onMouse={this.onMouse}
+              animation={animation}
+            />
+            <div
+              class={"dragged" + (isTouchDevice() ? " placed-touch" : "")}
+              style={
+                isTouchDevice()
+                  ? `left:10; top:${cellSize * 4}`
+                  : `left:${draggedAt[0]}; top:${draggedAt[1]};`
+              }
+            >
+              <Piece code={dragged} />
+            </div>
+            <div>
+              <button onClick={this.toggleMenu}>Menu</button>
+              {/* <button onClick={e => this.save()}>Save</button>
           <button onClick={e => this.load()}>Load</button>*/}
 
-          <button
-            style={`visibility:${this.state.autoPlay ? "visible" : "hidden"}`}
-            onClick={this.pause}
-          >
-            {paused ? "Continue" : "Pause"}
-          </button>
-          <button onClick={this.pass} disabled={!this.canPass()}>
-            Pass
-          </button>
-          <button onClick={this.undo} disabled={!this.canUndo()}>
-            Undo
-          </button>
-        </div>
-        <div class="history">
-          {history.map((_, i) =>
-            i % 3 == 0 ? (
-              <span
-                onMouseDown={e => {
-                  if (e.button == 0) this.jumpTo(i + 1);
-                }}
+              <button
+                style={`visibility:${
+                  this.state.autoPlay ? "visible" : "hidden"
+                }`}
+                onClick={this.pause}
               >
-                {" " + (i / 3 + 1)}.{history.slice(i, i + 3).join(" ")}
-              </span>
-            ) : null
-          )}          
-        </div>
-      </div>
-    );
+                {paused ? "Continue" : "Pause"}
+              </button>
+              <button onClick={this.pass} disabled={!this.canPass()}>
+                Pass
+              </button>
+              <button onClick={this.undo} disabled={!this.canUndo()}>
+                Undo
+              </button>
+            </div>
+            <div class="history">
+              {history.map((_, i) =>
+                i % 3 == 0 ? (
+                  <span
+                    onMouseDown={e => {
+                      if (e.button == 0) this.jumpTo(i + 1);
+                    }}
+                  >
+                    {" " + (i / 3 + 1)}.{history.slice(i, i + 3).join(" ")}
+                  </span>
+                ) : null
+              )}
+            </div>
+          </div>
+        );
+    }
   }
 }
 
