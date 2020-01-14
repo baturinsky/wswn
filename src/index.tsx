@@ -48,9 +48,15 @@ const pictures = " ♟♜♞♝♚♛";
 const cellSize = 80;
 const ALLOW_NORMAL_MOVE = false;
 
-type Mode = { name: string; bag: string; board: string; random?: boolean, description:string };
+type Mode = {
+  name: string;
+  bag: string;
+  board: string;
+  random?: boolean;
+  description: string;
+};
 
-let pieceCost=[0,0,1,-1,5,-5,3,-3,3,-3,0,0,9,-9];
+let pieceCost = [0, 0, 1, -1, 5, -5, 3, -3, 3, -3, 0, 0, 9, -9];
 
 const modes: Mode[] = [
   {
@@ -58,7 +64,7 @@ const modes: Mode[] = [
     bag: "KPRPBPNPQPNPBPRP",
     board: "rnbqkbnr/pppppppp/8/8/8/8/8/8 b kq - 0 1",
     description: `"Classic" mode. You place all usual white pieces in order, black starts with all pieces already in place.
-    Not that you can "Pass" the piece placement. You can use it to try and win with the least pieces placed possible.
+    Note that you can "Pass" the piece placement. You can use it to try and win with the least pieces placed possible.
     `
   },
   {
@@ -112,7 +118,7 @@ function possibleMoves(game: p4state, from: number) {
   let moves = p4_parse(game, game.to_play, game.enpassant, 0).map(
     ([score, s, e]) => fromP4Move([s, e])
   );
-  console.log(moves);
+  return moves;
 }
 
 const MMOVE = 0,
@@ -245,7 +251,7 @@ class Cell extends Component<CellProps> {
 class Menu extends Component<{
   currentSave: string;
   continue: () => void;
-  saves: [string, { board: string, moden:number }][];
+  saves: [string, { board: string; moden: number }][];
   saveAction: (action: number, slotInd: number) => void;
   start: (moden: number) => void;
 }> {
@@ -258,9 +264,7 @@ class Menu extends Component<{
             Select game mode
             <div class="modes-grid">
               {modes.map((mode, i) => (
-                <button onClick={e => this.props.start(i)}>
-                  {mode.name}
-                </button>
+                <button onClick={e => this.props.start(i)}>{mode.name}</button>
               ))}
             </div>
             {this.props.continue && (
@@ -283,10 +287,9 @@ class Menu extends Component<{
                 >
                   {save[1] ? (
                     <small>
-                      {(save[1].board || modes[0].board).replace(
-                        /\//g,
-                        " "
-                      ) + " " + modes[save[1].moden].name}
+                      {(save[1].board || modes[0].board).replace(/\//g, " ") +
+                        " " +
+                        modes[save[1].moden].name}
                     </small>
                   ) : (
                     "Save"
@@ -341,7 +344,7 @@ class Game extends Component<{}, GameState> {
     mouseAt: [0, 0],
     animation: null,
     moden: 0,
-    newmoden: 0,
+    newmoden: 0
   } as GameState;
 
   animation: { cell: number; x: number; y: number; stage: number } = null;
@@ -349,10 +352,12 @@ class Game extends Component<{}, GameState> {
   bag: string;
   seed = 0;
   passes = 0;
-  rng: ()=>number;
+  rng: () => number;
 
   get currentBagPiece() {
-    return !this.over && this.bag[Math.floor(this.game.moveno / 3) - this.passes];
+    return (
+      !this.over && this.bag[Math.floor(this.game.moveno / 3) - this.passes]
+    );
   }
 
   nextBagPiece(): string {
@@ -367,7 +372,7 @@ class Game extends Component<{}, GameState> {
     });
   }
 
-  init(modeName: string|number = "empty") {
+  init(modeName: string | number = "empty") {
     if (modeName != "empty") {
       let moden = 0;
       if (modeName in modes) moden = Number(modeName);
@@ -376,8 +381,7 @@ class Game extends Component<{}, GameState> {
       this.passes = 0;
       this.bag = mode.bag + "";
       if (mode.random) {
-        if(!this.seed)
-          this.seed =Math.random();
+        if (!this.seed) this.seed = Math.random();
         this.rng = newRng(this.seed);
         this.bag =
           this.bag.substr(0, 1) +
@@ -420,7 +424,7 @@ class Game extends Component<{}, GameState> {
 
     if (this.game) saves.push([PREFIX + (maxSave + 1), null]);
 
-    saves = saves.sort((a, b) => (a[0] > b[0] ? 1 : -1));
+    saves.sort((a, b) => (a[0] > b[0] ? 1 : -1));
 
     this.setState({ currentSave, saves, maxSave });
     return saves;
@@ -443,7 +447,7 @@ class Game extends Component<{}, GameState> {
   async aiMove() {
     if (this.over) return;
     let move = this.game.findmove(4);
-    let res = this.game.move(move[0], move[1]);
+    this.game.move(move[0], move[1]);
     await this.animateMove(...(fromP4Move(move) as [number, number]));
   }
 
@@ -580,7 +584,7 @@ class Game extends Component<{}, GameState> {
 
   pass = () => {
     this.fullMove([-1, -1]);
-    this.passes ++;
+    this.passes++;
   };
 
   undo = async () => {
@@ -604,11 +608,11 @@ class Game extends Component<{}, GameState> {
     });
   }
 
-  calculateMaterial(){
+  calculateMaterial() {
     let material = 0;
-    for(let move of this.game.history){
-      if(move[0]<0 && move[1] != -1){
-        material += pieceCost[-move[0]]
+    for (let move of this.game.history) {
+      if (move[0] < 0 && move[1] != -1) {
+        material += pieceCost[-move[0]];
       }
     }
     return material;
@@ -676,9 +680,9 @@ class Game extends Component<{}, GameState> {
   };
 
   start = async (newmoden: number) => {
-    this.setState({newmoden})
-    this.goPage(PSTART)
-  }
+    this.setState({ newmoden });
+    this.goPage(PSTART);
+  };
 
   reallyStart = async (moden: number) => {
     this.init(String(moden));
@@ -689,9 +693,7 @@ class Game extends Component<{}, GameState> {
   };
 
   continue = () => {
-    if (!this.game)
-      if (!this.load(this.state.currentSave))
-        this.init(0);
+    if (!this.game) if (!this.load(this.state.currentSave)) this.init(0);
     this.goPage(PGAME);
   };
 
@@ -707,26 +709,32 @@ class Game extends Component<{}, GameState> {
 
     switch (page) {
       case PLANDING:
-        return <div>
-          <h1>White Starts With Nothing</h1>
-          <div class="intro">
-          This game plays by Chess rules, but instead of moving pieces directly, 
-          you gradually place white (and in some modes, black) pieces and leave making moves to AI.<br/>
-          Goal is, naturally, the winning of the white side.
-          Note that you only can place pieces on respective side's half of the board,
-          and pawns also can't be placed on the first or last row.
+        return (
+          <div>
+            <h1>White Starts With Nothing</h1>
+            <div class="intro">
+              This game plays by Chess rules, but instead of moving pieces
+              directly, you gradually place white (and in some modes, black)
+              pieces and leave making moves to AI.
+              <br />
+              Goal is, naturally, the winning of the white side. Note that you
+              only can place pieces on respective side's half of the board, and
+              pawns also can't be placed on the first or last row.
+            </div>
+            <button onClick={e => this.goPage(PMENU)}>Start</button>
           </div>
-          <button onClick={e=>this.goPage(PMENU)}>Start</button>
-        </div>;
-      case PSTART:      
-        return <div>
-          <h1>{modes[this.state.newmoden].name}</h1>
-          <div class="intro">
-          {modes[this.state.newmoden].description}
+        );
+      case PSTART:
+        return (
+          <div>
+            <h1>{modes[this.state.newmoden].name}</h1>
+            <div class="intro">{modes[this.state.newmoden].description}</div>
+            <button onClick={e => this.goPage(PMENU)}>Cancel</button>
+            <button onClick={e => this.reallyStart(this.state.newmoden)}>
+              Start
+            </button>
           </div>
-          <button onClick={e=>this.goPage(PMENU)}>Cancel</button>
-          <button onClick={e=>this.reallyStart(this.state.newmoden)}>Start</button>
-        </div>;
+        );
       case PMENU:
         return (
           <Menu
@@ -756,9 +764,18 @@ class Game extends Component<{}, GameState> {
             {this.over > 0 && (
               <div class="game-over">
                 <h1>{[0, "BLACK WIN", "WHITE WIN", "DRAW"][this.over]}</h1>
-                <div>Turns: <big>{Math.ceil(this.game.history.length/3)}</big>{" "}
-                Placed pieces cost: <big>{this.calculateMaterial()}</big></div>
-                <div>Score (200 - Turns - Cost*3): <big>{200 - Math.ceil(this.game.history.length/3) - this.calculateMaterial()*3}</big></div>
+                <div>
+                  Turns: <big>{Math.ceil(this.game.history.length / 3)}</big>{" "}
+                  Placed pieces cost: <big>{this.calculateMaterial()}</big>
+                </div>
+                <div>
+                  Score (200 - Turns - Cost*3):{" "}
+                  <big>
+                    {200 -
+                      Math.ceil(this.game.history.length / 3) -
+                      this.calculateMaterial() * 3}
+                  </big>
+                </div>
               </div>
             )}
             <Board
