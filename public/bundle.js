@@ -1695,7 +1695,7 @@
     function possibleMoves(game, from) {
         p4_prepare(game);
         let moves = p4_parse(game, game.to_play, game.enpassant, 0).map(([score, s, e]) => fromP4Move([s, e]));
-        console.log(moves);
+        return moves;
     }
     const MMOVE = 0, MDOWN = 1, MUP = 2;
     class Board extends m {
@@ -1756,7 +1756,9 @@
                             h("div", { style: "grid-column-end: span 2;" }, "or load a save"),
                             this.props.saves.map((save, i) => [
                                 h("button", { class: "load-button" +
-                                        (save[0] == this.props.currentSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, (save[1].board || modes[0].board).replace(/\//g, " ") + " " + modes[save[1].moden].name)) : ("Save")),
+                                        (save[0] == this.props.currentSave ? " last-save" : ""), onClick: e => this.props.saveAction(SAVE_OR_LOAD, i) }, save[1] ? (h("small", null, (save[1].board || modes[0].board).replace(/\//g, " ") +
+                                    " " +
+                                    modes[save[1].moden].name)) : ("Save")),
                                 h("button", { class: "x-button", disabled: !save[1], onClick: e => this.props.saveAction(REMOVE, i) }, "X")
                             ]))
                     ])));
@@ -1779,7 +1781,7 @@
                 mouseAt: [0, 0],
                 animation: null,
                 moden: 0,
-                newmoden: 0,
+                newmoden: 0
             };
             this.animation = null;
             this.seed = 0;
@@ -1933,7 +1935,7 @@
             });
         }
         get currentBagPiece() {
-            return !this.over && this.bag[Math.floor(this.game.moveno / 3) - this.passes];
+            return (!this.over && this.bag[Math.floor(this.game.moveno / 3) - this.passes]);
         }
         nextBagPiece() {
             return this.currentBagPiece;
@@ -1991,7 +1993,7 @@
             }
             if (this.game)
                 saves.push([PREFIX + (maxSave + 1), null]);
-            saves = saves.sort((a, b) => (a[0] > b[0] ? 1 : -1));
+            saves.sort((a, b) => (a[0] > b[0] ? 1 : -1));
             this.setState({ currentSave, saves, maxSave });
             return saves;
         }
@@ -2003,7 +2005,7 @@
                 if (this.over)
                     return;
                 let move = this.game.findmove(4);
-                let res = this.game.move(move[0], move[1]);
+                this.game.move(move[0], move[1]);
                 yield this.animateMove(...fromP4Move(move));
             });
         }
@@ -2119,19 +2121,19 @@
             let draggedAt = mouseAt ? mouseAt.map(v => v - cellSize / 2) : [-100, -100];
             switch (page) {
                 case PLANDING:
-                    return h("div", null,
+                    return (h("div", null,
                         h("h1", null, "White Starts With Nothing"),
                         h("div", { class: "intro" },
                             "This game plays by Chess rules, but instead of moving pieces directly, you gradually place white (and in some modes, black) pieces and leave making moves to AI.",
                             h("br", null),
                             "Goal is, naturally, the winning of the white side. Note that you only can place pieces on respective side's half of the board, and pawns also can't be placed on the first or last row."),
-                        h("button", { onClick: e => this.goPage(PMENU) }, "Start"));
+                        h("button", { onClick: e => this.goPage(PMENU) }, "Start")));
                 case PSTART:
-                    return h("div", null,
+                    return (h("div", null,
                         h("h1", null, modes[this.state.newmoden].name),
                         h("div", { class: "intro" }, modes[this.state.newmoden].description),
                         h("button", { onClick: e => this.goPage(PMENU) }, "Cancel"),
-                        h("button", { onClick: e => this.reallyStart(this.state.newmoden) }, "Start"));
+                        h("button", { onClick: e => this.reallyStart(this.state.newmoden) }, "Start")));
                 case PMENU:
                     return (h(Menu, { currentSave: this.state.currentSave, saves: this.state.saves, continue: (this.game || this.state.currentSave) && this.continue, saveAction: this.saveAction, start: this.start }));
                 case PGAME:
@@ -2151,8 +2153,11 @@
                                 "Placed pieces cost: ",
                                 h("big", null, this.calculateMaterial())),
                             h("div", null,
-                                "Score (200 - Turns - Cost*3): ",
-                                h("big", null, 200 - Math.ceil(this.game.history.length / 3) - this.calculateMaterial() * 3)))),
+                                "Score (200 - Turns - Cost*3):",
+                                " ",
+                                h("big", null, 200 -
+                                    Math.ceil(this.game.history.length / 3) -
+                                    this.calculateMaterial() * 3)))),
                         h(Board, { cols: 8, rows: 8, Cell: Cell, position: position, canDropAt: this.canDropAt, onMouse: this.onMouse, animation: animation }),
                         h("div", { class: "dragged" + (isTouchDevice() ? " placed-touch" : ""), style: isTouchDevice()
                                 ? `left:10; top:${cellSize * 4}`
